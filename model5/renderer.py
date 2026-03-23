@@ -457,7 +457,7 @@ def draw_hud(surface, font_sm, font_lg, menu_btn, true_form_cb,
     surface.blit(lbl, lbl.get_rect(center=menu_btn.center))
 
     # True Form checkbox (immediately right of the Options button)
-    top_text_col = (255, 205, 72)
+    top_text_col = (227, 42, 255)
     true_form_cb.draw(surface, font_sm, text_color=top_text_col)
 
     # Telemetry stats (top-centre)

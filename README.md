@@ -149,8 +149,12 @@ python model3/simulator.py
 
 ![model4-thumbnail](media/model4-thumbnail.webp)
 
+Implemented standard text operations in options menu (highlight, move cursor, copy paste,...)
+
 **Entry**
 
 ```bash
 python model4/simulator.py
 ```
+
+### Model 5: Slip Ratio + Traction Curve (1D)

@@ -165,7 +165,7 @@ def torque_curve_to_str(curve):
 
 # ── Colour palette ────────────────────────────────────────────────────────────
 SKY_TOP        = (8, 18, 46)
-SKY_BOTTOM     = (20, 84, 78)
+SKY_BOTTOM     = (135, 0, 181)
 ROAD_COLOR     = (50,  50,  50)
 ROAD_LINE      = (200, 200, 200)
 MARKER_COLOR   = (255, 255, 255)
@@ -182,11 +182,11 @@ OVERLAY_BG     = (15,  15,  20, 210)
 PANEL_BG       = (25,  28,  38, 240)
 TEXT_BRIGHT    = (230, 235, 255)
 TEXT_DIM       = (140, 145, 165)
-ACCENT         = (4, 143, 0)
+ACCENT         = (224, 42, 255)
 ACCENT2        = (255, 140,  50)
 BTN_NORMAL     = (45,  50,  68)
 BTN_HOVER      = (65,  72,  96)
-BTN_ACTIVE     = (0, 199, 168)
+BTN_ACTIVE     = (155, 105, 186)
 
 GRAPH_COLORS = [
     (100, 220, 100),   # 0: velocity      - green

@@ -15,3 +15,6 @@ plotly>=5.15.0
 # Development & Testing
 pytest>=7.0.0
 black>=23.0.0
+
+# QoF-specific Utilities
+pyperclip>=1.8.0
