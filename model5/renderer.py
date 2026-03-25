@@ -7,16 +7,10 @@ import pygame
 import random
 
 from constants import (
-    SKY_TOP, SKY_BOTTOM,
-    ROAD_COLOR, MARKER_COLOR,
-    CAR_BODY, CAR_ROOF, CAR_WINDOW, CAR_WHEEL, CAR_WHEEL_RIM,
-    CLOUD_COLOR,
-    GRAPH_BG, GRAPH_GRID, GRAPH_AXIS,
-    PANEL_BG, ACCENT,
-    TEXT_BRIGHT, TEXT_DIM,
-    BTN_NORMAL, BTN_HOVER,
-    GRAPH_COLORS, GRAPH_LABELS,
-    PIXELS_PER_METER, MARKER_INTERVAL,
+    SKY_TOP, SKY_BOTTOM, ROAD_COLOR, MARKER_COLOR, CAR_BODY, CAR_ROOF, CAR_WINDOW, 
+    CAR_WHEEL, CAR_WHEEL_RIM, CLOUD_COLOR, GRAPH_BG, GRAPH_GRID, GRAPH_AXIS, PANEL_BG, 
+    ACCENT, TEXT_BRIGHT, TEXT_DIM, BTN_NORMAL, BTN_HOVER, GRAPH_COLORS, GRAPH_LABELS, 
+    PIXELS_PER_METER, MARKER_INTERVAL
 )
 from physics import GraphBuffer
 
@@ -58,19 +52,27 @@ class Cloud:
 # Scene drawing
 # ─────────────────────────────────────────────────────────────────────────────
 
-def draw_sky(surface, horizon_y, screen_w, cam_x=0.0):
-    """Draw a vertical gradient midnight sky and a slow-parallax star layer."""
-    key = (horizon_y, screen_w)
+def draw_sky(surface, horizon_y, screen_w, cam_x=0.0, low_detail=False, day_mode=False):
+    """Draw a vertical gradient sky; optionally draw stars unless z is on."""
+    key = (horizon_y, screen_w, day_mode)
+    top = (104, 145, 191) if day_mode else SKY_TOP
+    bottom = (180, 215, 255) if day_mode else SKY_BOTTOM
+
     if key not in _sky_cache:
         sky_surf = pygame.Surface((screen_w, horizon_y))
         for y in range(horizon_y):
             t = y / max(horizon_y, 1)
-            r = int(SKY_TOP[0] + (SKY_BOTTOM[0] - SKY_TOP[0]) * t)
-            g = int(SKY_TOP[1] + (SKY_BOTTOM[1] - SKY_TOP[1]) * t)
-            b = int(SKY_TOP[2] + (SKY_BOTTOM[2] - SKY_TOP[2]) * t)
+            r = int(top[0] + (bottom[0] - top[0]) * t)
+            g = int(top[1] + (bottom[1] - top[1]) * t)
+            b = int(top[2] + (bottom[2] - top[2]) * t)
             pygame.draw.line(sky_surf, (r, g, b), (0, y), (screen_w, y))
         _sky_cache.clear()   # keep only the most-recent size
         _sky_cache[key] = sky_surf
+
+    surface.blit(_sky_cache[key], (0, 0))
+
+    if low_detail or day_mode:
+        return
 
     if key not in _star_cache:
         rng = random.Random(screen_w * 10007 + horizon_y * 97)
@@ -124,10 +126,12 @@ def draw_road(surface, road_rect, road_y, screen_w, cam_x, font_sm):
                          (x, road_mid_y - 2, dash_len, 4))
         x += period
 
-    # Distance markers every MARKER_INTERVAL metres
+    # Distance markers every MARKER_INTERVAL metres (at bottom of road)
     cam_px         = cam_x * PIXELS_PER_METER
     first_marker_m = math.floor(cam_x / MARKER_INTERVAL) * MARKER_INTERVAL
     m = first_marker_m
+    marker_top = road_y + road_rect.height - 20
+    marker_bottom = road_y + road_rect.height
     while True:
         world_px = m * PIXELS_PER_METER
         screen_x = int(world_px - cam_px + screen_w // 2)
@@ -137,15 +141,44 @@ def draw_road(surface, road_rect, road_y, screen_w, cam_x, font_sm):
             m += MARKER_INTERVAL
             continue
         pygame.draw.line(surface, MARKER_COLOR,
-                         (screen_x, road_y),
-                         (screen_x, road_y + 14), 2)
+                         (screen_x, marker_top),
+                         (screen_x, marker_bottom), 2)
         lbl = _marker_label_cache.get(m)
         if lbl is None:
             lbl = font_sm.render(f"{m}m", True, MARKER_COLOR)
             _marker_label_cache[m] = lbl
-        surface.blit(lbl, (screen_x - lbl.get_width() // 2, road_y + 16))
+        surface.blit(lbl, (screen_x - lbl.get_width() // 2, marker_top - lbl.get_height() - 2))
         m += MARKER_INTERVAL
 
+def draw_skid_marks(surface, skid_marks, road_y, screen_w, cam_x):
+    cam_px = cam_x * PIXELS_PER_METER
+    for mark in skid_marks:
+        sx0 = int(mark['x0'] * PIXELS_PER_METER - cam_px + screen_w // 2)
+        sx1 = int(mark['x1'] * PIXELS_PER_METER - cam_px + screen_w // 2)
+        if sx1 < 0 or sx0 > screen_w: continue
+        a = int(mark['alpha'])
+        if a <= 0: continue
+        
+        # Mix skid color with road color to fake alpha blending on lines
+        r, g, b = (int(20 * (a/255) + 50 * (1 - a/255)),) * 3
+
+        # Draw a single thicker skid line closer to the wheel position
+        skid_y = road_y + 10
+        pygame.draw.line(surface, (r, g, b), (sx0, skid_y), (sx1, skid_y), 8)
+
+def draw_smoke(surface, smoke_particles, screen_w, cam_x):
+    cam_px = cam_x * PIXELS_PER_METER
+    for p in smoke_particles:
+        sx = int(p['x'] * PIXELS_PER_METER - cam_px + screen_w // 2)
+        sy = int(p['y'])
+        if sx + p['r'] < 0 or sx - p['r'] > screen_w: continue
+        a = int(max(0, min(255, p['alpha'])))
+        if a == 0: continue
+        
+        # Draw fading smoke circles using temporary alpha surface
+        s = pygame.Surface((int(p['r']*2), int(p['r']*2)), pygame.SRCALPHA)
+        pygame.draw.circle(s, (220, 220, 220, a), (int(p['r']), int(p['r'])), int(p['r']))
+        surface.blit(s, (sx - int(p['r']), sy - int(p['r'])))
 
 def _clamp(value, lo, hi):
     return max(lo, min(hi, value))
@@ -315,6 +348,8 @@ def draw_car(surface, cx, wy, body_w, body_h, wheel_r,
 
     # --- simplified sprite mode ---
 
+    body_color = getattr(car, 'chassis_color', CAR_BODY)
+
     axle_y = wy - wheel_r
     wheelbase_px = max(140, int(car.L * PIXELS_PER_METER))
 
@@ -351,7 +386,7 @@ def draw_car(surface, cx, wy, body_w, body_h, wheel_r,
         (x5, y0),
     ]
 
-    pygame.draw.polygon(surface, CAR_BODY, car_shape)
+    pygame.draw.polygon(surface, body_color, car_shape)
     pygame.draw.polygon(surface, (0, 0, 0), car_shape, 2)
 
     # window
@@ -396,7 +431,7 @@ def draw_car(surface, cx, wy, body_w, body_h, wheel_r,
 
 
 def draw_dashboard(surface, font_sm, car, throttle, brake, screen_w, horizon_y, auto_shift_on=False):
-    dash_w = 200
+    dash_w = 210 # slightly wider to fit the new text
     dash_h = 130
     dash_x = screen_w - dash_w - 20
     dash_y = horizon_y - dash_h - 20
@@ -421,14 +456,17 @@ def draw_dashboard(surface, font_sm, car, throttle, brake, screen_w, horizon_y, 
     m_lbl = font_sm.render(f"Shift: {mode_str}", True, mode_col)
     surface.blit(m_lbl, (dash_x + 88, dash_y + 10))
     
-    # RPM bar
+    # --- RPM GAUGE ---
     rpm_pct = max(0.0, min(1.0, (engine.rpm - rpm_idle) / (rpm_redline - rpm_idle)))
-    pygame.draw.rect(surface, (50, 50, 50), (dash_x + 10, dash_y + 35, 180, 10))
-    pygame.draw.rect(surface, (200, 50, 50) if rpm_pct > 0.9 else (50, 200, 50), 
-                     (dash_x + 10, dash_y + 35, int(180 * rpm_pct), 10))
-    r_lbl = font_sm.render(f"RPM: {int(engine.rpm)}", True, (200, 200, 200))
-    surface.blit(r_lbl, (dash_x + 10, dash_y + 48))
-    
+    pygame.draw.rect(surface, (50, 50, 50), (dash_x + 10, dash_y + 35, 190, 8))
+    pygame.draw.rect(surface, (200, 50, 50) if rpm_pct > 0.9 else (50, 200, 50),
+                     (dash_x + 10, dash_y + 35, int(190 * rpm_pct), 8))
+
+    eng_col = (255, 80, 80) if rpm_pct > 0.9 else (50, 200, 50)
+    eng_lbl = font_sm.render(f"RPM:{int(engine.rpm):4d}", True, eng_col)
+    surface.blit(eng_lbl, (dash_x + 10, dash_y + 52))
+    # ----------------------
+
     # Throttle gauge
     t_rect = pygame.Rect(dash_x + 10, dash_y + 80, int(80 * throttle), 8)
     pygame.draw.rect(surface, (50, 50, 50), (dash_x + 10, dash_y + 80, 80, 8))
@@ -441,7 +479,7 @@ def draw_dashboard(surface, font_sm, car, throttle, brake, screen_w, horizon_y, 
     if brake > 0: pygame.draw.rect(surface, (200, 100, 100), b_rect)
     surface.blit(font_sm.render("BRK", True, (150, 150, 150)), (dash_x + 110, dash_y + 90))
 
-def draw_hud(surface, font_sm, font_lg, menu_btn, true_form_cb,
+def draw_hud(surface, font_sm, font_lg, menu_btn, true_form_cb, low_detail_cb,
              fps_display, sim_time, car, throttle, brake,
              paused, horizon_y, screen_w,
              dt, target_fps,
@@ -456,9 +494,10 @@ def draw_hud(surface, font_sm, font_lg, menu_btn, true_form_cb,
     lbl = font_sm.render("Options", True, TEXT_BRIGHT)
     surface.blit(lbl, lbl.get_rect(center=menu_btn.center))
 
-    # True Form checkbox (immediately right of the Options button)
+    # True Form and Low Detail checkboxes
     top_text_col = (227, 42, 255)
     true_form_cb.draw(surface, font_sm, text_color=top_text_col)
+    low_detail_cb.draw(surface, font_sm, text_color=top_text_col)
 
     # Telemetry stats (top-centre)
     top_shadow_col = (70, 45, 10)
@@ -505,160 +544,110 @@ def draw_hud(surface, font_sm, font_lg, menu_btn, true_form_cb,
         surface.blit(pb, pb.get_rect(centerx=screen_w // 2, y=horizon_y - 36))
     draw_dashboard(surface, font_sm, car, throttle, brake, screen_w, horizon_y, auto_shift_on)
 
+    # Traction control / slip warning (bottom-left on road)
+    if getattr(car, "is_slipping", False):
+        if int(sim_time * 15) % 2 == 0:  # Fast blink
+            slip_lbl = font_sm.render("!! TRC / SLIP !!", True, (255, 255, 80))
+            text_w, text_h = slip_lbl.get_size()
+            x = 12
+            y = surface.get_height() - text_h - 10
+            # Add subtle dark background for readability on surface
+            bg = pygame.Surface((text_w + 10, text_h + 6), pygame.SRCALPHA)
+            bg.fill((16, 16, 24, 180))
+            surface.blit(bg, (x - 5, y - 3))
+            surface.blit(slip_lbl, (x, y))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Graph renderers
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _downsample(data: list, max_pts: int) -> list:
-    """
-    Return at most max_pts elements from data using Peak-Preservation.
-    This prevents thin spikes from flickering/jittering as they scroll.
-    """
     n = len(data)
-    if n <= max_pts:
-        return data
-        
+    if n <= max_pts: return data
     res = []
     step = n / max_pts
     for i in range(max_pts):
-        start = int(i * step)
-        end = int((i + 1) * step)
-        
+        start, end = int(i * step), int((i + 1) * step)
         chunk = data[start:end] if end > start else [data[start]]
-        
-        # Find the most extreme values in this chunk of time
-        c_min = min(chunk)
-        c_max = max(chunk)
-        c_first = chunk[0]
-        
-        # Keep the value that deviates the most from the start of the chunk
-        if abs(c_max - c_first) > abs(c_min - c_first):
-            res.append(c_max)
-        else:
-            res.append(c_min)
-            
+        c_min, c_max, c_first = min(chunk), max(chunk), chunk[0]
+        res.append(c_max if abs(c_max - c_first) > abs(c_min - c_first) else c_min)
     return res
 
 
+def _stable_plot_range(data: list) -> tuple[float, float]:
+    """Return a robust y-range; flatten tiny spans to avoid visual jitter artifacts."""
+    mn, mx = min(data), max(data)
+    span = mx - mn
+    mag = max(abs(mx), abs(mn), 1.0)
+    # If variation is extremely small relative to value scale, render as a flat line.
+    if span <= max(1e-3, mag * 1e-4):
+        center = 0.5 * (mx + mn)
+        return center - 1.0, center + 1.0
+    return mn, mx
+
 def draw_graph_full(surface, rect, graph_buf, font_sm):
-    """Draw 14 individual channel plots in a strict 2 rows x 7 columns grid."""
-    n_cols = 7
-    n_rows = 2
-    w_each = rect.width // n_cols
-    h_each = rect.height // n_rows
+    n_cols, n_rows = 7, 2
+    w_each, h_each = rect.width // n_cols, rect.height // n_rows
     margin = 4
 
     pygame.draw.rect(surface, GRAPH_BG, rect)
 
     for ch in range(GraphBuffer.CHANNELS):
-        # Calculate exactly which row and column this channel belongs to
-        col = ch % n_cols
-        row = ch // n_cols
+        col, row = ch % n_cols, ch // n_cols
+        r = pygame.Rect(rect.x + col * w_each + margin, rect.y + row * h_each + margin, w_each - 2 * margin, h_each - 2 * margin)
         
-        r = pygame.Rect(rect.x + col * w_each + margin,
-                        rect.y + row * h_each + margin,
-                        w_each - 2 * margin,
-                        h_each - 2 * margin)
-        
-        # "Grayed Out" logic for Slip Ratio (Channel 9)
-        is_grayed = (ch == 9)
-        bg_col = (15, 15, 18) if is_grayed else GRAPH_BG
-        grid_col = (30, 30, 35) if is_grayed else GRAPH_GRID
-        text_col = (90, 90, 100) if is_grayed else GRAPH_COLORS[ch]
-
-        pygame.draw.rect(surface, bg_col, r)
-        pygame.draw.rect(surface, grid_col, r, 1)
+        # Model 5 update: No more "grayed out" styling!
+        pygame.draw.rect(surface, GRAPH_BG, r)
+        pygame.draw.rect(surface, GRAPH_GRID, r, 1)
 
         data = graph_buf.get(ch)
         if len(data) < 2:
-            lbl = font_sm.render(GRAPH_LABELS[ch], True, text_col)
-            surface.blit(lbl, (r.x + 4, r.y + 4))
+            surface.blit(font_sm.render(GRAPH_LABELS[ch], True, GRAPH_COLORS[ch]), (r.x + 4, r.y + 4))
             continue
             
         data = _downsample(data, max(2, r.width))
+        mn, mx = _stable_plot_range(data)
 
-        mn, mx = min(data), max(data)
-        if mx == mn:
-            mid = (mn + mx) / 2
-            mn  = mid - 1.0
-            mx  = mid + 1.0
-
-        # Horizontal grid lines and Y-axis labels
         for gi in range(5):
             gy = r.bottom - int((gi / 4) * r.height)
-            pygame.draw.line(surface, grid_col, (r.x, gy), (r.right, gy))
-            if not is_grayed:
-                val_lbl = font_sm.render(f"{mn + (mx - mn) * (gi / 4):.1f}", True, (100, 100, 110))
-                surface.blit(val_lbl, (r.x + 2, gy - 9))
+            pygame.draw.line(surface, GRAPH_GRID, (r.x, gy), (r.right, gy))
+            surface.blit(font_sm.render(f"{mn + (mx - mn) * (gi / 4):.1f}", True, (100, 100, 110)), (r.x + 2, gy - 9))
 
-        # Plot the curve
         pts = []
         for i, v in enumerate(data):
             px_ = r.x + int(i / (len(data) - 1) * r.width)
             py_ = r.bottom - int((v - mn) / (mx - mn) * r.height)
-            py_ = max(r.y, min(r.bottom, py_))
-            pts.append((px_, py_))
+            pts.append((px_, max(r.y, min(r.bottom, py_))))
             
-        if len(pts) >= 2:
-            pygame.draw.lines(surface, text_col, False, pts, 2)
-
-        # Title Label
-        lbl = font_sm.render(GRAPH_LABELS[ch], True, text_col)
-        surface.blit(lbl, (r.x + 4, r.y + 4))
-
-
+        if len(pts) >= 2: pygame.draw.lines(surface, GRAPH_COLORS[ch], False, pts, 2)
+        surface.blit(font_sm.render(GRAPH_LABELS[ch], True, GRAPH_COLORS[ch]), (r.x + 4, r.y + 4))
 
 def draw_graph_combined(surface, rect, graph_buf, font_sm, channels_active):
-    """Draw all active channels normalized 0→1 on a single plot."""
-    pygame.draw.rect(surface, GRAPH_BG,   rect)
-    pygame.draw.rect(surface, GRAPH_GRID, rect, 1)
-
+    pygame.draw.rect(surface, GRAPH_BG, rect); pygame.draw.rect(surface, GRAPH_GRID, rect, 1)
     r = rect.inflate(-8, -8)
-
-    # Grid
     for gi in range(5):
         gy = r.bottom - int((gi / 4) * r.height)
         pygame.draw.line(surface, GRAPH_GRID, (r.x, gy), (r.right, gy))
-        val_lbl = font_sm.render(f"{gi / 4:.2f}", True, GRAPH_AXIS)
-        surface.blit(val_lbl, (r.x + 2, gy - 9))
+        surface.blit(font_sm.render(f"{gi / 4:.2f}", True, GRAPH_AXIS), (r.x + 2, gy - 9))
 
-    legend_x = rect.x + 8
-    legend_y = rect.y + 10
-
+    legend_x, legend_y = rect.x + 8, rect.y + 10
     for ch in range(GraphBuffer.CHANNELS):
-        if not channels_active[ch]:
-            continue
+        if not channels_active[ch]: continue
         data = graph_buf.get(ch)
-        if len(data) < 2:
-            continue
+        if len(data) < 2: continue
         data = _downsample(data, max(2, r.width))
-        mn, mx = min(data), max(data)
-        if mx == mn:
-            mn -= 1.0
-            mx += 1.0
+        mn, mx = _stable_plot_range(data)
 
         pts = []
         for i, v in enumerate(data):
-            px_  = r.x + int(i / (len(data) - 1) * r.width)
-            norm = (v - mn) / (mx - mn)
-            py_  = r.bottom - int(norm * r.height)
-            py_  = max(r.y, min(r.bottom, py_))
-            pts.append((px_, py_))
-        if len(pts) >= 2:
-            pygame.draw.lines(surface, GRAPH_COLORS[ch], False, pts, 2)
+            pts.append((r.x + int(i / (len(data) - 1) * r.width), max(r.y, min(r.bottom, r.bottom - int(((v - mn) / (mx - mn)) * r.height)))))
+        if len(pts) >= 2: pygame.draw.lines(surface, GRAPH_COLORS[ch], False, pts, 2)
 
-        # Legend swatch + label
-        pygame.draw.line(surface, GRAPH_COLORS[ch],
-                         (legend_x, legend_y + 6),
-                         (legend_x + 18, legend_y + 6), 2)
+        pygame.draw.line(surface, GRAPH_COLORS[ch], (legend_x, legend_y + 6), (legend_x + 18, legend_y + 6), 2)
         lbl = font_sm.render(GRAPH_LABELS[ch], True, GRAPH_COLORS[ch])
         surface.blit(lbl, (legend_x + 22, legend_y))
         legend_x += lbl.get_width() + 36
-        if legend_x > rect.right - 120:
-            legend_x  = rect.x + 8
-            legend_y += 18
+        if legend_x > rect.right - 120: legend_x, legend_y = rect.x + 8, legend_y + 18
 
     note = font_sm.render("Normalized 0.0 → 1.0 per channel", True, TEXT_DIM)
-    surface.blit(note, (rect.x + rect.width - note.get_width() - 8,
-                        rect.bottom - note.get_height() - 4))
+    surface.blit(note, (rect.x + rect.width - note.get_width() - 8, rect.bottom - note.get_height() - 4))

@@ -1,8 +1,10 @@
-# Car Physics
+# Longitudinal Car Physics
 
-Main reference: [Macro Monster's Car Physics Guide](https://www.asawicki.info/Mirror/Car%20Physics%20for%20Games/Car%20Physics%20for%20Games.html).
+Main reference: [Macro Monster's Car Physics Guide](https://www.asawicki.info/Mirror/Car%20Physics%20for%20Games/Car%20Physics%20for%20Games.html)
 
-Check out the learning journey on my blog: [yuk068.github.io](https://yuk068.github.io/).
+Check out the learning journey on my blog: [yuk068.github.io](https://yuk068.github.io/)
+
+I will make a new repo for model 6-8, link will be updated **here**
 
 I try to break down each model both mathematically (continuous math) and implement them in code.
 
@@ -21,7 +23,7 @@ I try to break down each model both mathematically (continuous math) and impleme
     - Drive Wheel Acceleration (simplified)
 - [x] Model 4: Wheel Rotational Dynamics (1D)
     - Drive Wheel Acceleration (full)
-- [ ] Model 5: Slip Ratio + Traction Curve (1D)
+- [x] Model 5: Slip Ratio + Traction Curve (1D)
     - Slip Ratio & Traction Force
 - [ ] Model 6: Low-Speed Kinematic Turning (2D)
     - Curves (low speed)
@@ -36,7 +38,7 @@ Completed models:
 - [Model 2: Load Transfer Without Traction Limits (1D)](#model-2-load-transfer-without-traction-limits-1d)
 - [Model 3: Engine Torque + Gearing without Slip (1D)](#model-3-engine-torque--gearing-without-slip-1d)
 - [Model 4: Wheel Rotational Dynamics (1D)](#model-4-wheel-rotational-dynamics-1d)
-- [Model 5: Slip Ratio + Traction Curve (1D)]
+- [Model 5: Slip Ratio + Traction Curve (1D)](#model-5-slip-ratio--traction-curve-1d)
 - [Model 6: Low-Speed Kinematic Turning (2D)]
 - [Model 7: High-Speed Lateral Tire Model (2D)]
 - [Model 8: Full Coupled Tire Model (2D)]
@@ -135,6 +137,8 @@ First model in the roadmap with a proper transmission engine.
 - Allow toggle for **Auto Transmission / Manual Transmission**
 - Allow toggle for load transfer elements from model 2 (hide by default)
 
+Car can now go in reverse.
+
 **Key constraint:** wheels are "glued" to the ground.
 
 **Entry**
@@ -158,3 +162,41 @@ python model4/simulator.py
 ```
 
 ### Model 5: Slip Ratio + Traction Curve (1D)
+
+[Technical Breakdown](https://yuk068.github.io/2026/03/23/car-physics-model5)
+
+![model5-thumbnail](media/model5-thumbnail.webp)
+
+The final longitudinal simulator on this roadmap. Multiple car presets to try out.
+
+**Controls**
+
+- **Keyboard Layout**
+
+| Key | Action | Behavior |
+| :--- | :--- | :--- |
+| **W/Up** | Throttle | **Simulated Analog:** 0 to 1 (1s ramp-up) |
+| **Space/Down** | Brake | **Simulated Analog:** 0 to 1 (1s ramp-up) |
+| **A/Left** | Gear Down | Digital / Instant |
+| **D/Right** | Gear Up | Digital / Instant |
+| **Esc** | Options | Opens Menu |
+| **1** | Toggle Auto Shift | - |
+| **R** | Reset Scenario | - |
+
+- **Xbox Controller Layout**
+
+| Control | Action | Behavior |
+| :--- | :--- | :--- |
+| **RT** (Right Trigger) | Throttle | **Native Analog:** 0.0 to 1.0 |
+| **LT** (Left Trigger) | Brake | **Native Analog:** 0.0 to 1.0 |
+| **X/LB** Button | Gear Down | Digital / Instant |
+| **B/RB** Button | Gear Up | Digital / Instant |
+| **Start** Button | Options | Opens Menu |
+| **A** | Toggle Auto Shift | - |
+| **Select** | Reset Scenario | - |
+
+**Entry**
+
+```bash
+python model5/simulator.py
+```

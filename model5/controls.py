@@ -60,7 +60,8 @@ def get_xinput_state(pad=0):
     """
     Poll XInput pad `pad`.
 
-    Returns (right_trigger_0_to_1, left_trigger_binary, start_button_bool)
+    Returns (right_trigger_0_to_1, left_trigger_0_to_1, start_button_bool,
+             x_button_bool, b_button_bool, lb_button_bool, rb_button_bool)
     or None if unavailable.
     """
     if _xinput_dll is None:
@@ -72,10 +73,12 @@ def get_xinput_state(pad=0):
 
     rt        = state.Gamepad.bRightTrigger / 255.0
     lt        = state.Gamepad.bLeftTrigger / 255.0  # Float for analog brake
-    start_btn = bool(state.Gamepad.wButtons & XINPUT_BUTTON_START)
-    x_btn     = bool(state.Gamepad.wButtons & 0x4000) # X button
-    b_btn_pad = bool(state.Gamepad.wButtons & 0x2000) # B button
+    start_btn  = bool(state.Gamepad.wButtons & XINPUT_BUTTON_START)
+    select_btn = bool(state.Gamepad.wButtons & 0x0020) # Back / Select button
+    a_btn      = bool(state.Gamepad.wButtons & 0x1000) # A button
+    x_btn      = bool(state.Gamepad.wButtons & 0x4000) # X button
+    b_btn_pad  = bool(state.Gamepad.wButtons & 0x2000) # B button
+    lb_btn     = bool(state.Gamepad.wButtons & 0x0100) # LB button
+    rb_btn     = bool(state.Gamepad.wButtons & 0x0200) # RB button
 
-    return rt, lt, start_btn, x_btn, b_btn_pad
-
-    return rt, lt, start_btn, x_btn, b_btn_pad
+    return rt, lt, start_btn, select_btn, a_btn, x_btn, b_btn_pad, lb_btn, rb_btn

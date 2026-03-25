@@ -14,12 +14,54 @@ sibling modules:
 import pygame
 import random
 
-from constants import CONST_FIELDS, THROTTLE_RAMP_DEFAULT
+from constants import CONST_FIELDS, THROTTLE_RAMP_DEFAULT, TIMESTEP_OPTIONS, FPS_OPTIONS
 from physics   import CarModel, GraphBuffer
 from controls  import load_xinput, get_xinput_state
 from renderer  import (Cloud, draw_sky, draw_clouds, draw_road, draw_car,
                        draw_hud, draw_graph_full, draw_graph_combined)
 from ui        import OptionsMenu, CheckBox
+
+import os
+
+def _closest_timestep(dt):
+    valid_dts = [v for v, _ in TIMESTEP_OPTIONS]
+    return min(valid_dts, key=lambda x: abs(x - dt))
+
+
+def _closest_fps(fps):
+    return min(FPS_OPTIONS, key=lambda x: abs(x - fps))
+
+
+def _load_global_sim_config():
+    config_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config.yaml"))
+    dt = 0.01
+    target_fps = 60
+    try:
+        with open(config_file, "r", encoding="utf-8") as f:
+            for line in f:
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    continue
+                # Strip inline comments after the value, e.g. "fps: 144 # 60 ; ..."
+                s = s.split("#", 1)[0].strip()
+                if not s:
+                    continue
+                if s.startswith("timestep:"):
+                    try:
+                        dt = float(s.split(":", 1)[1].strip())
+                    except ValueError:
+                        pass
+                elif s.startswith("fps:"):
+                    try:
+                        target_fps = int(float(s.split(":", 1)[1].strip()))
+                    except ValueError:
+                        pass
+    except FileNotFoundError:
+        pass
+
+    dt = _closest_timestep(dt)
+    target_fps = _closest_fps(target_fps)
+    return dt, target_fps
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -47,8 +89,7 @@ class Simulator:
         self.font_lg = pygame.font.SysFont("Consolas", 22, bold=True)
 
         # Simulation settings
-        self.dt                = 0.01
-        self.target_fps        = 60
+        self.dt, self.target_fps = _load_global_sim_config()
         self.graph_mode        = "full"
         self.control_mode      = "keyboard"
         self.throttle_ramp     = THROTTLE_RAMP_DEFAULT

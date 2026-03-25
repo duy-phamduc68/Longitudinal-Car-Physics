@@ -27,6 +27,12 @@ from constants import (
     CONST_FIELDS,
     PARAM_LIMITS,
     CONST_SECTIONS,
+    DEFAULT_PRESET,
+    ECONOMY_COMPACT,
+    SPORTS_CAR,
+    TURBO_PERFORMANCE,
+    SUV_TRUCK,
+    ELECTRIC_EV,
     parse_gear_ratios,
     parse_torque_curve,
     gear_ratios_to_str,
@@ -157,6 +163,9 @@ class CheckBox:
             )
         if text_color is None:
             text_color = TEXT_BRIGHT
+        # Add subtle shadow for checkbox labels (consistent with top HUD text style)
+        shadow = font.render(self.label, True, (70, 45, 10))
+        surface.blit(shadow, (self.rect.right + 9, self.rect.y + 1))
         txt = font.render(self.label, True, text_color)
         surface.blit(txt, (self.rect.right + 8, self.rect.y))
 
@@ -184,6 +193,7 @@ class OptionsMenu:
             "Engine",
             "Vehicle Geometry & Mass",
             "Resistances",
+            "Tires / Traction",
         ]
         self._collapsed = {name: False for name in self._section_order}
 
@@ -196,6 +206,10 @@ class OptionsMenu:
         self._selection_anchor = None
         self._clipboard = ""
         self._mouse_dragging = False
+
+        self._ramp_editing = False
+        self._const_editing = None
+        self._ramp_text = _fmt_const(self.sim.throttle_ramp)
 
         self._sync_const_texts()
 
@@ -553,6 +567,29 @@ class OptionsMenu:
             self.sim.reset_scenario()
         return changed
 
+    def _apply_preset(self, preset):
+        car = self.sim.car
+        engine = car.engine
+        for key, value in preset.items():
+            if key == "GEAR_RATIOS":
+                engine.GEAR_RATIOS = dict(value)
+            elif key == "TORQUE_CURVE":
+                engine.TORQUE_CURVE = list(value)
+            elif key == "UPSHIFT_RPM":
+                self.sim.upshift_rpm = float(value)
+                engine.upshift_rpm = float(value)
+            elif key == "DOWNSHIFT_RPM":
+                self.sim.downshift_rpm = float(value)
+                engine.downshift_rpm = float(value)
+            elif key == "CHASSIS_COLOR":
+                setattr(car, "chassis_color", value)
+            elif hasattr(engine, key):
+                setattr(engine, key, value)
+            elif hasattr(car, key):
+                setattr(car, key, value)
+            elif hasattr(self.sim, key):
+                setattr(self.sim, key, value)
+
     def _all_const_attrs(self):
         attrs = []
         for _, fields in CONST_SECTIONS:
@@ -581,6 +618,7 @@ class OptionsMenu:
             "fps_buttons": [],
             "comb_checks": [],
             "graph_buttons": {},
+            "preset_buttons": [],
             "expand_btn": None,
             "close_btn": None,
             "reset_btn": None,
@@ -683,11 +721,37 @@ class OptionsMenu:
             auto_rect = pygame.Rect(inner_x, auto_y, 22, 22)
             self._ui["auto_shift_rect"] = auto_rect
 
-            model2_y = auto_y + 30
+            day_y = auto_y + 30
+            day_rect = pygame.Rect(inner_x, day_y, 22, 22)
+            self._ui["day_mode_rect"] = day_rect
+
+            model2_y = day_y + 30
             model2_rect = pygame.Rect(inner_x, model2_y, 22, 22)
             self._ui["model2_visual_rect"] = model2_rect
 
-            y = model2_y + 30
+            preset_label_y = model2_y + 34
+            preset_y = preset_label_y + 18
+            self._ui["preset_buttons"] = []
+            presets = [
+                ("Default", DEFAULT_PRESET, 100),
+                ("Economy", ECONOMY_COMPACT, 100),
+                ("Sport", SPORTS_CAR, 100),
+                ("Turbo", TURBO_PERFORMANCE, 100),
+                ("SUV", SUV_TRUCK, 100),
+                ("EV (Auto Shift Recommended)", ELECTRIC_EV, 220),  # wider
+            ]
+
+            button_gap = 8
+            px = inner_x
+
+            for name, preset, width in presets:
+                pr = pygame.Rect(px, preset_y, width, row)
+                btn = Button(pr, name, toggle=True, active=False)
+                self._ui["preset_buttons"].append((name, preset, btn))
+
+                px += width + button_gap
+
+            y = preset_y + row + 10
             self._ui["section_bodies"]["Controls"] = {
                 "rect": pygame.Rect(x0 + 10, body_top, pw - 20, y - body_top),
                 "labels": {
@@ -706,6 +770,7 @@ class OptionsMenu:
             "Engine",
             "Vehicle Geometry & Mass",
             "Resistances",
+            "Tires / Traction",
         ]:
             header_rect = pygame.Rect(x0 + 10, y, pw - 20, header_h)
             self._ui["section_headers"][sec_name] = header_rect
@@ -861,6 +926,17 @@ class OptionsMenu:
                 self.sim.combined_channels[i] = cb.checked
                 return True
 
+        # Preset type buttons
+        for name, preset, btn in self._ui.get("preset_buttons", []):
+            if btn.handle_event(event, mapped_pos):
+                for _, _, b in self._ui["preset_buttons"]:
+                    b.active = False
+                btn.active = True
+                self._apply_preset(preset)
+                self._sync_const_texts()
+                self.sim.reset_scenario()
+                return True
+
         # Controls section
         ramp_rect = self._ui.get("ramp_rect")
         auto_rect = self._ui.get("auto_shift_rect")
@@ -872,13 +948,13 @@ class OptionsMenu:
                 self.sim.enable_auto_shift = not self.sim.enable_auto_shift
                 return True
 
-            if model2_rect and mapped_pos and model2_rect.collidepoint(mapped_pos):
-                self.sim.show_model2_elements = not self.sim.show_model2_elements
+            day_rect = self._ui.get("day_mode_rect")
+            if day_rect and mapped_pos and day_rect.collidepoint(mapped_pos):
+                self.sim.day_mode = not self.sim.day_mode
                 return True
 
-            if ramp_rect and mapped_pos and ramp_rect.collidepoint(mapped_pos):
-                cursor = self._cursor_index_from_x(self._ramp_text, ramp_rect, mapped_pos[0], self.sim.font_sm)
-                self._begin_editing(None, ramp=True, cursor_pos=cursor)
+            if model2_rect and mapped_pos and model2_rect.collidepoint(mapped_pos):
+                self.sim.show_model2_elements = not self.sim.show_model2_elements
                 return True
 
             if mapped_pos:
@@ -936,7 +1012,7 @@ class OptionsMenu:
 
         content = pygame.Surface((pw, self._total_height), pygame.SRCALPHA)
 
-        title = font_md.render("Options - Model 4", True, TEXT_BRIGHT)
+        title = font_md.render("Options - Model 5", True, TEXT_BRIGHT)
         content.blit(title, (16, 12))
 
         expand_btn = self._ui.get("expand_btn")
@@ -1087,12 +1163,29 @@ class OptionsMenu:
                 pygame.draw.line(content, ACCENT, (auto_rect.x + 8, auto_rect.y + 16), (auto_rect.x + 18, auto_rect.y + 6), 2)
             content.blit(font_sm.render("Enable Auto Shift", True, TEXT_BRIGHT), labels["auto"])
 
+            day_rect = self._ui.get("day_mode_rect")
+            if day_rect:
+                pygame.draw.rect(content, BTN_NORMAL, day_rect, border_radius=3)
+                pygame.draw.rect(content, ACCENT, day_rect, 1, border_radius=3)
+                if self.sim.day_mode:
+                    pygame.draw.line(content, ACCENT, (day_rect.x + 4, day_rect.y + 11), (day_rect.x + 8, day_rect.y + 16), 2)
+                    pygame.draw.line(content, ACCENT, (day_rect.x + 8, day_rect.y + 16), (day_rect.x + 18, day_rect.y + 6), 2)
+                content.blit(font_sm.render("Day Mode", True, TEXT_BRIGHT), (day_rect.x + 30, day_rect.y + 2))
+
             pygame.draw.rect(content, BTN_NORMAL, model2_rect, border_radius=3)
             pygame.draw.rect(content, ACCENT, model2_rect, 1, border_radius=3)
             if self.sim.show_model2_elements:
                 pygame.draw.line(content, ACCENT, (model2_rect.x + 4, model2_rect.y + 11), (model2_rect.x + 8, model2_rect.y + 16), 2)
                 pygame.draw.line(content, ACCENT, (model2_rect.x + 8, model2_rect.y + 16), (model2_rect.x + 18, model2_rect.y + 6), 2)
             content.blit(font_sm.render("Show Load-Transfer Visual Elements", True, TEXT_BRIGHT), labels["model2"])
+
+            # Preset buttons
+            # (rendered in row in Controls section)
+            if self._ui.get("preset_buttons"):
+                preset_label_y = model2_rect.y + 34
+                content.blit(font_sm.render("Vehicle Presets:", True, TEXT_DIM), (model2_rect.x, preset_label_y))
+                for _, _, btn in self._ui.get("preset_buttons", []):
+                    btn.draw(content, font_sm)
 
         # Action buttons
         self._ui["reset_btn"].draw(content, font_md)
