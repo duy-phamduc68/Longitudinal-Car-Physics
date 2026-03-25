@@ -4,11 +4,11 @@ Main reference: [Macro Monster's Car Physics Guide](https://www.asawicki.info/Mi
 
 Check out the learning journey on my blog: [yuk068.github.io](https://yuk068.github.io/)
 
-Model 6-8 (Planar Simulators) is in this repository: [duy-phamduc68/Planar-Car-Physics](https://github.com/duy-phamduc68/Planar-Car-Physics)
+**Model 6-8** (Planar Simulators) are in this repository: [duy-phamduc68/Planar-Car-Physics](https://github.com/duy-phamduc68/Planar-Car-Physics)
 
 I try to break down each model both mathematically (continuous math) and implement them in code.
 
-This repository contains code for Model 1-5 of the roadmap.
+This repository contains code for **Model 1-5** of the roadmap.
 
 ## Roadmap
 
