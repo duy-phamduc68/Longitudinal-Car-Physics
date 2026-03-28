@@ -4,7 +4,9 @@ Main reference: [Macro Monster's Car Physics Guide](https://www.asawicki.info/Mi
 
 Check out the learning journey on my blog: [yuk068.github.io](https://yuk068.github.io/)
 
-**Model 6-8** (Planar Simulators) are in this repository: [duy-phamduc68/Planar-Car-Physics](https://github.com/duy-phamduc68/Planar-Car-Physics)
+**Model 6** (Planar Kinematic Car Model) is in this repository: [duy-phamduc68/Planar-Kinematic-Car-Model](https://github.com/duy-phamduc68/Planar-Kinematic-Car-Model)
+
+I will update links for model 7-8 soon.
 
 I try to break down each model both mathematically (continuous math) and implement them in code.
 
@@ -27,7 +29,7 @@ This repository contains code for **Model 1-5** of the roadmap.
     - Drive Wheel Acceleration (full)
 - [x] Model 5: Slip Ratio + Traction Curve (1D)
     - Slip Ratio & Traction Force
-- [ ] Model 6: Low-Speed Kinematic Turning (2D)
+- [x] Model 6: Low-Speed Kinematic Turning (2D)
     - Curves (low speed)
 - [ ] Model 7: High-Speed Lateral Tire Model (2D)
     - High Speed Turning
@@ -41,7 +43,7 @@ Completed models:
 - [Model 3: Engine Torque + Gearing without Slip (1D)](#model-3-engine-torque--gearing-without-slip-1d)
 - [Model 4: Wheel Rotational Dynamics (1D)](#model-4-wheel-rotational-dynamics-1d)
 - [Model 5: Slip Ratio + Traction Curve (1D)](#model-5-slip-ratio--traction-curve-1d)
-- [Model 6: Low-Speed Kinematic Turning (2D)]
+- [Model 6: Low-Speed Kinematic Turning (2D)](https://github.com/duy-phamduc68/Planar-Kinematic-Car-Model)
 - [Model 7: High-Speed Lateral Tire Model (2D)]
 - [Model 8: Full Coupled Tire Model (2D)]
 
